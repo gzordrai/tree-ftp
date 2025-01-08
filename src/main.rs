@@ -1,14 +1,14 @@
 extern crate dotenv;
 
+mod ftp;
+
 use dotenv::dotenv;
+use ftp::client::FtpClient;
 use log::info;
 use regex::Regex;
-use std::borrow::Cow;
 use std::env;
-use std::io::Read;
-use std::net::TcpStream;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     let debug_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
@@ -24,24 +24,12 @@ fn main() {
     }
 
     let addr_with_port: String = format!("{}:21", addr);
+    let mut client: FtpClient = FtpClient::new(&addr_with_port)?;
 
-    if let Ok(mut stream) = TcpStream::connect(addr_with_port) {
-        println!("Connected to the server!");
+    client.authenticate("anonymous", "anonymous")?;
+    client.retrieve_server_info()?;
 
-        let mut buffer: [u8; 128] = [0; 128];
-
-        match stream.read(&mut buffer) {
-            Ok(size) => {
-                let response: Cow<'_, str> = String::from_utf8_lossy(&buffer[..size]);
-                println!("Read {} bytes: {}", size, response);
-            }
-            Err(e) => {
-                println!("Failed to read from stream: {}", e);
-            }
-        }
-    } else {
-        println!("Couldn't connect to server...");
-    }
+    Ok(())
 }
 
 fn is_valid_ip_or_domain(addr: &str) -> bool {
