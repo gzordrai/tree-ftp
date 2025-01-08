@@ -1,11 +1,23 @@
+extern crate dotenv;
+
+use dotenv::dotenv;
+use log::info;
 use regex::Regex;
 use std::borrow::Cow;
-use std::env::args;
+use std::env;
 use std::io::Read;
 use std::net::TcpStream;
 
 fn main() {
-    let addr: String = args().nth(1).expect("Please provide an address");
+    dotenv().ok();
+
+    let debug_level = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
+    env::set_var("RUST_LOG", debug_level.clone());
+    env_logger::init();
+
+    info!("Debug level: {}", debug_level);
+
+    let addr: String = env::args().nth(1).expect("Please provide an address");
 
     if !is_valid_ip_or_domain(&addr) {
         panic!("Invalid address format: {}", addr);
