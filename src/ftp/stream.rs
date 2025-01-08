@@ -5,7 +5,7 @@ use std::{
 
 use log::{debug, info};
 
-use crate::ftp::ftp_error::Result;
+use crate::ftp::error::Result;
 
 pub enum FtpCommand {
     User(String),
