@@ -15,11 +15,16 @@ pub enum FtpCommand {
     Pwd,
     Type(String),
     Pasv,
+    List
 }
 
 
 pub struct FtpStream {
     stream: TcpStream,
+}
+
+pub struct  FtpDataStream {
+    stream: TcpStream
 }
 
 impl FtpStream {
@@ -77,6 +82,7 @@ impl FtpStream {
             FtpCommand::Pwd => "PWD\r\n".to_string(),
             FtpCommand::Type(t) => format!("TYPE {}\r\n", t),
             FtpCommand::Pasv => "PASV\r\n".to_string(),
+            FtpCommand::List => "LIST\r\n".to_string()
         }
     }
 
@@ -95,5 +101,47 @@ impl FtpStream {
         debug!("Server response: {}", response);
 
         Ok(response)
+    }
+}
+
+impl FtpDataStream {
+    pub fn new(addr: &str) -> Result<Self> {
+        let stream: TcpStream = TcpStream::connect(addr)?;
+
+        info!("Connected to the data server");
+
+        Ok(FtpDataStream { stream })
+    }
+
+    pub fn read_response(&mut self) -> Result<Vec<String>> {
+        let mut reader = BufReader::new(&self.stream);
+        let mut response_lines = Vec::new();
+
+        loop {
+            let mut line = String::new();
+            let bytes_read = reader.read_line(&mut line)?;
+
+            if bytes_read == 0 {
+                break;
+            }
+
+            debug!("Read line: {}", line.trim_end());
+
+            response_lines.push(line.trim_end().to_string());
+
+            // Check if the line is part of a multi-line response
+            if line.starts_with(" ") || line.starts_with("\t") {
+                continue;
+            }
+
+            // Check if the line is the last one of a multi-line response
+            if line.len() >= 4 && &line[3..4] == " " {
+                break;
+            }
+        }
+
+        debug!("Full response: {:?}", response_lines);
+
+        Ok(response_lines)
     }
 }
