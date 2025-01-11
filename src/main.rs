@@ -3,7 +3,7 @@ extern crate dotenv;
 mod ftp;
 
 use dotenv::dotenv;
-use ftp::client::FtpClient;
+use ftp::{client::FtpClient, stream::FtpDataStream};
 use log::info;
 use regex::Regex;
 use std::env;
@@ -28,6 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     client.authenticate("anonymous", "anonymous")?;
     client.retrieve_server_info()?;
+    client.passive_mode()?;
+    client.list_dir();
 
     Ok(())
 }
