@@ -1,6 +1,5 @@
 use std::{
-    io::{BufRead, BufReader, Write},
-    net::TcpStream,
+    io::{BufRead, BufReader, Write}, net::TcpStream
 };
 
 use log::{debug, info};
@@ -42,8 +41,8 @@ impl CommandStream {
         Ok(response)
     }
 
-    pub fn send_command(&mut self, cmd: FtpCommand) -> Result<String> {
-        let command_str = match cmd {
+    fn format_command(cmd: FtpCommand) -> String {
+        match cmd {
             FtpCommand::User(username) => format!("USER {}\r\n", username),
             FtpCommand::Pass(password) => format!("PASS {}\r\n", password),
             FtpCommand::Syst => "SYST\r\n".to_string(),
@@ -52,11 +51,18 @@ impl CommandStream {
             FtpCommand::Type(t) => format!("TYPE {}\r\n", t),
             FtpCommand::Pasv => "PASV\r\n".to_string(),
             FtpCommand::List => "LIST\r\n".to_string(),
-        };
+            FtpCommand::Cwd(path) => format!("CWD {}\r\n", path)
+        }
+    }
+
+    pub fn send_command(&mut self, cmd: FtpCommand) -> Result<String> {
+        let command_str: String = CommandStream::format_command(cmd);
 
         debug!("Sending command: {}", command_str.trim_end());
+
         self.stream.write(command_str.as_bytes())?;
         self.stream.flush()?;
+
         debug!("Command flushed: {}", command_str.trim_end());
 
         self.read_response()
