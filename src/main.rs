@@ -3,7 +3,7 @@ extern crate dotenv;
 mod ftp;
 
 use dotenv::dotenv;
-use ftp::{client::FtpClient, stream::FtpDataStream};
+use ftp::client::FtpClient;
 use log::info;
 use regex::Regex;
 use std::env;

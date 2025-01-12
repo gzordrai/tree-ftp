@@ -1,16 +1,24 @@
 use log::{debug, info};
 
-use crate::ftp::error::Result;
-use crate::ftp::stream::{FtpCommand, FtpDataStream, FtpStream};
+
+use crate::ftp::{
+    command_stream::CommandStream,
+    command::FtpCommand,
+    data_stream::FtpDataStream,
+    error::Result
+};
 
 pub struct FtpClient {
-    ftp_stream: FtpStream,
+    ftp_stream: CommandStream,
     ftp_data_stream: Option<FtpDataStream>,
 }
 
 impl FtpClient {
     pub fn new(addr: &str) -> Result<Self> {
-        let ftp_stream: FtpStream = FtpStream::new(addr)?;
+        let mut ftp_stream: CommandStream = CommandStream::new(addr)?;
+        let response: String = ftp_stream.read_response()?;
+
+        info!("Server response: {}", response);
 
         Ok(FtpClient {
             ftp_stream: ftp_stream,
