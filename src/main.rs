@@ -1,5 +1,6 @@
 extern crate dotenv;
 
+mod fs;
 mod ftp;
 
 use dotenv::dotenv;
