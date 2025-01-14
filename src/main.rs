@@ -4,11 +4,12 @@ mod fs;
 mod ftp;
 mod utils;
 
+use clap::Parser;
 use dotenv::dotenv;
 use ftp::client::FtpClient;
 use log::info;
 use std::env;
-use utils::DomainAllowPort;
+use utils::{parser::Args, validator::DomainAllowPort};
 use validators::traits::ValidateString;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,8 +22,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Debug level: {}", debug_level);
 
-    let addr: String = env::args().nth(1).expect("Please provide an address");
-    let parsed_addr: DomainAllowPort = DomainAllowPort::parse_str(&addr).unwrap();
+    let args: Args = Args::parse();
+    let parsed_addr: DomainAllowPort = DomainAllowPort::parse_str(&args.address).unwrap();
     let addr_with_port: String = if let Some(port) = parsed_addr.port {
         format!("{}:{}", parsed_addr.domain, port)
     } else {
@@ -31,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut client: FtpClient = FtpClient::new(&addr_with_port)?;
 
-    client.authenticate("anonymous", "anonymous")?;
+    client.authenticate(&args.username, &args.password)?;
     client.retrieve_server_info()?;
     client.passive_mode()?;
     client.list_dir();
