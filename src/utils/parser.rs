@@ -11,5 +11,13 @@ pub struct Args {
 
     #[arg(short, long, default_value_t = String::from("anonymous"))]
     pub password: String,
-}
 
+    #[arg(short, long, default_value_t = 1)]
+    pub depth: usize,
+
+    #[arg(short, long)]
+    pub json: bool,
+
+    #[arg(long)]
+    pub bfs: bool,
+}
