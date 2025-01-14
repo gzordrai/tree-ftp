@@ -7,7 +7,6 @@ mod utils;
 use dotenv::dotenv;
 use ftp::client::FtpClient;
 use log::info;
-use regex::Regex;
 use std::env;
 use utils::DomainAllowPort;
 use validators::traits::ValidateString;
