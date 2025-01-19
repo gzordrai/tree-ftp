@@ -13,6 +13,15 @@ pub enum NodeEnum {
     File(File),
 }
 
+impl NodeEnum {
+    pub fn to_string(&self, indent: &str) -> String {
+        match self {
+            NodeEnum::Directory(dir) => dir.to_string(indent),
+            NodeEnum::File(file) => format!("{}{}\n", indent, file.name),
+        }
+    }
+}
+
 impl Node for NodeEnum {
     fn name(&self) -> &str {
         match self {

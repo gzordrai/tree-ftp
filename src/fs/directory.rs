@@ -20,6 +20,17 @@ impl Directory {
     pub fn add(&mut self, node: impl Into<NodeEnum>) {
         self.nodes.push(node.into());
     }
+
+    pub fn to_string(&self, indent: &str) -> String {
+        let mut result: String = format!("{}{}\n", indent, self.name);
+        let new_indent: String = format!("{}{}", indent, "    ");
+
+        for node in &self.nodes {
+            result.push_str(&node.to_string(&new_indent));
+        }
+
+        result
+    }
 }
 
 impl Node for Directory {
