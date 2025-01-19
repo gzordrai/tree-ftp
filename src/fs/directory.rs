@@ -1,4 +1,7 @@
-use super::{node::{Node, NodeEnum}};
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeMap;
+
+use super::node::{Node, NodeEnum};
 
 #[derive(Debug)]
 pub struct Directory {
@@ -22,5 +25,27 @@ impl Directory {
 impl Node for Directory {
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+impl Serialize for Directory {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map: <S as Serializer>::SerializeMap = serializer.serialize_map(Some(self.nodes.len()))?;
+
+        for node in &self.nodes {
+            match node {
+                NodeEnum::Directory(dir) => {
+                    map.serialize_entry(&dir.name, dir)?;
+                }
+                NodeEnum::File(file) => {
+                    map.serialize_entry(&file.name, file)?;
+                }
+            }
+        }
+
+        map.end()
     }
 }

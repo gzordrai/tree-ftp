@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use super::directory::Directory;
 use super::file::File;
 
@@ -5,7 +7,7 @@ pub trait Node {
     fn name(&self) -> &str;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum NodeEnum {
     Directory(Directory),
     File(File),

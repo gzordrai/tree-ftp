@@ -9,4 +9,6 @@ dotenv = "0.15.0"
 env_logger = "0.11.6"
 log = "0.4.22"
 regex = "1.11.1"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
 validators = { version = "0.25.3", features = ["domain"]}

@@ -1,6 +1,8 @@
+use serde::Serialize;
+
 use super::node::Node;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct File {
     pub name: String,
 }
