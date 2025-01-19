@@ -51,7 +51,8 @@ impl CommandStream {
             FtpCommand::Type(t) => format!("TYPE {}\r\n", t),
             FtpCommand::Pasv => "PASV\r\n".to_string(),
             FtpCommand::List => "LIST\r\n".to_string(),
-            FtpCommand::Cwd(path) => format!("CWD {}\r\n", path)
+            FtpCommand::Cwd(path) => format!("CWD {}\r\n", path),
+            FtpCommand::Cdup => "CDUP\r\n".to_string()
         }
     }
 
