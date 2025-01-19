@@ -6,8 +6,10 @@ mod utils;
 
 use clap::Parser;
 use dotenv::dotenv;
+use fs::node::NodeEnum;
 use ftp::client::FtpClient;
 use log::info;
+use serde_json::to_string;
 use std::env;
 use utils::{parser::Args, validator::DomainAllowPort};
 use validators::traits::ValidateString;
@@ -35,7 +37,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.authenticate(&args.username, &args.password)?;
     client.retrieve_server_info()?;
     client.passive_mode()?;
-    client.list_dir();
+
+    let root: NodeEnum = client.list_dir()?;
+
+    if args.json {
+        println!("{}", to_string(&root).unwrap());
+    } else {
+        println!("{:?}", root.to_string(""))
+    }
 
     Ok(())
 }
