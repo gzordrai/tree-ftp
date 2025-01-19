@@ -1,14 +1,15 @@
 use log::{debug, info};
 
-
-use crate::ftp::{
-    command_stream::CommandStream,
-    command::FtpCommand,
-    data_stream::FtpDataStream,
-    error::Result
+use crate::{
+    fs::{directory::Directory, file::File, node::NodeEnum},
+    ftp::{
+        command::FtpCommand, command_stream::CommandStream, data_stream::FtpDataStream,
+        error::Result,
+    },
 };
 
 pub struct FtpClient {
+    data_addr: Option<String>,
     ftp_stream: CommandStream,
     ftp_data_stream: Option<FtpDataStream>,
 }
@@ -21,6 +22,7 @@ impl FtpClient {
         info!("Server response: {}", response);
 
         Ok(FtpClient {
+            data_addr: None,
             ftp_stream: ftp_stream,
             ftp_data_stream: None,
         })
@@ -61,49 +63,105 @@ impl FtpClient {
         info!("Passive mode entered");
         debug!("Parsing passive mode response: {}", response);
 
-        let addr: String = FtpClient::parse_passive_mode_response(response)?;
+        let addr: String = FtpClient::parse_passive_mode_response(self, response)?;
+        self.data_addr = Some(addr.clone());
 
         debug!("Connecting to data client at {}", addr);
+
         self.ftp_data_stream = Some(FtpDataStream::new(&addr)?);
 
         Ok(())
     }
 
-    fn parse_passive_mode_response(res: String) -> Result<String> {
-        let start: usize = res.find('(').expect("Opening parenthesis not found") + 1;
-        let end: usize = res.find(')').expect("Closing parenthesis not found");
-        let content: &str = &res[start..end];
-        let parts: Vec<&str> = content.split(',').collect();
+    fn parse_passive_mode_response(&mut self, res: String) -> Result<String> {
+        if let Some(start) = res.find('(') {
+            if let Some(end) = res.find(')') {
+                let content: &str = &res[start + 1..end];
+                let parts: Vec<&str> = content.split(',').collect();
 
-        if parts.len() < 6 {
-            panic!("invalid data");
+                if parts.len() < 6 {
+                    return Err("Invalid data in passive mode response".into());
+                }
+
+                let ip = format!("{}.{}.{}.{}", parts[0], parts[1], parts[2], parts[3]);
+                let port = parts[4].parse::<u16>()? * 256 + parts[5].parse::<u16>()?;
+
+                return Ok(format!("{}:{}", ip, port));
+            } else {
+                return Err("Closing parenthesis not found in passive mode response".into());
+            }
         }
 
-        let ip: String = format!("{}.{}.{}.{}", parts[0], parts[1], parts[2], parts[3]);
-        let port: u16 = parts[4].parse::<u16>()? * 256 + parts[5].parse::<u16>()?;
+        if self.data_addr.is_some() {
+            return Ok(self.data_addr.clone().unwrap());
+        }
 
-        Ok(format!("{}:{}", ip, port))
+        Err("Opening parenthesis not found in passive mode response".into())
     }
 
-    pub fn list_dir(&mut self) -> Result<Vec<String>> {
+    pub fn list_dir(&mut self, depth: usize) -> Result<NodeEnum> {
         if self.ftp_data_stream.is_none() {
             self.passive_mode()?;
         }
-        let data_stream = self.ftp_data_stream.as_mut().ok_or("Data stream not initialized")?;
-        let _ = self.ftp_stream.send_command(FtpCommand::List);
-        let response_lines = data_stream.read_response()?;
-        let mapped_lines: Vec<String> = response_lines.iter().map(|line| {
+
+        self.ftp_stream.send_command(FtpCommand::List)?;
+        self.ftp_stream.read_response()?;
+
+        let response_lines: Vec<String> = self.ftp_data_stream.as_mut().unwrap().read_response()?;
+        let mut root: Directory = Directory::new(String::from("."));
+
+        for line in response_lines {
+            let node_name: String = Self::get_file_name(&line);
+
             if line.chars().next() == Some('d') {
-                format!("Directory: {}", line)
+                let mut subdir: Directory = Directory::new(node_name.clone());
+
+                Self::populate_dir(self, node_name.clone(), &mut subdir, depth - 1)?;
+                root.add(subdir);
             } else {
-                format!("File: {}", line)
+                root.add(File::new(node_name));
             }
-        }).collect();
-    
-        for line in &mapped_lines {
-            println!("{}", line);
         }
-    
-        Ok(mapped_lines)
+
+        Ok(NodeEnum::Directory(root))
+    }
+
+    fn get_file_name(line: &str) -> String {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+
+        if parts.len() < 9 {
+            String::new()
+        } else {
+            parts[8..].join(" ")
+        }
+    }
+
+    fn populate_dir(&mut self, dir_name: String, dir: &mut Directory, depth: usize) -> Result<()> {
+        if depth == 0 {
+            return Ok(());
+        }
+
+        self.ftp_stream.send_command(FtpCommand::Cwd(dir_name))?;
+        self.passive_mode()?;
+        self.ftp_stream.send_command(FtpCommand::List)?;
+        self.ftp_stream.read_response()?;
+        let response_lines: Vec<String> = self.ftp_data_stream.as_mut().unwrap().read_response()?;
+
+        for line in response_lines {
+            let node_name: String = Self::get_file_name(&line);
+
+            if line.chars().next() == Some('d') {
+                let mut subdir: Directory = Directory::new(node_name.clone());
+
+                Self::populate_dir(self, node_name.clone(), &mut subdir, depth - 1)?;
+                dir.add(subdir);
+            } else {
+                dir.add(File::new(node_name));
+            }
+        }
+
+        self.ftp_stream.send_command(FtpCommand::Cdup)?;
+
+        Ok(())
     }
 }

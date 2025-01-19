@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.retrieve_server_info()?;
     client.passive_mode()?;
 
-    let root: NodeEnum = client.list_dir()?;
+    let root: NodeEnum = client.list_dir(args.depth)?;
 
     if args.json {
         println!("{}", to_string(&root).unwrap());
