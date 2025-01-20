@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if args.json {
         println!("{}", to_string(&root).unwrap());
     } else {
-        println!("{:?}", root.to_string(""))
+        println!("{}", root.to_string(""));
     }
 
     Ok(())

@@ -1,5 +1,5 @@
-use serde::{Serialize, Serializer};
 use serde::ser::SerializeMap;
+use serde::{Serialize, Serializer};
 
 use super::node::{Node, NodeEnum};
 
@@ -22,14 +22,29 @@ impl Directory {
     }
 
     pub fn to_string(&self, indent: &str) -> String {
-        let mut result: String = format!("{}{}\n", indent, self.name);
-        let new_indent: String = format!("{}{}", indent, "    ");
+        let mut ret: String = String::new();
 
-        for node in &self.nodes {
-            result.push_str(&node.to_string(&new_indent));
+        for (i, node) in self.nodes.iter().enumerate() {
+            let is_last: bool = i == self.nodes.len() - 1;
+            let prefix: &str = if is_last { "└── " } else { "├── " };
+
+            match node {
+                NodeEnum::Directory(directory) => {
+                    ret.push_str(&format!("{}{}{}\n", indent, prefix, directory.name()));
+
+                    if is_last {
+                        ret.push_str(&directory.to_string(&format!("{}    ", indent)));
+                    } else {
+                        ret.push_str(&directory.to_string(&format!("{}│    ", indent)));
+                    }
+                }
+                NodeEnum::File(file) => {
+                    ret.push_str(&format!("{}{}{}\n", indent, prefix, file.name()))
+                }
+            }
         }
 
-        result
+        ret
     }
 }
 
@@ -44,7 +59,8 @@ impl Serialize for Directory {
     where
         S: Serializer,
     {
-        let mut map: <S as Serializer>::SerializeMap = serializer.serialize_map(Some(self.nodes.len()))?;
+        let mut map: <S as Serializer>::SerializeMap =
+            serializer.serialize_map(Some(self.nodes.len()))?;
 
         for node in &self.nodes {
             match node {
