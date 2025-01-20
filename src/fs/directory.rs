@@ -3,13 +3,31 @@ use serde::{Serialize, Serializer};
 
 use super::node::{Node, NodeEnum};
 
+/// Represents a directory in the filesystem.
+///
+/// A `Directory` contains a name and a list of nodes, which can be either
+/// subdirectories or files.
 #[derive(Debug)]
 pub struct Directory {
+    /// The name of the directory.
     pub name: String,
-    pub nodes: Vec<NodeEnum>, // Use NodeEnum to store both Directory and File
+
+    /// The nodes contained within the directory.
+    ///
+    /// This can include both subdirectories and files, represented by the `NodeEnum` enum.
+    pub nodes: Vec<NodeEnum>,
 }
 
 impl Directory {
+    /// Creates a new directory with the given name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - A `String` that holds the name of the directory.
+    ///
+    /// # Returns
+    ///
+    /// A new `Directory` instance.
     pub fn new(name: String) -> Self {
         Directory {
             name,
@@ -17,10 +35,25 @@ impl Directory {
         }
     }
 
+    /// Adds a node to the directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - An item that can be converted into a `NodeEnum`.
     pub fn add(&mut self, node: impl Into<NodeEnum>) {
         self.nodes.push(node.into());
     }
 
+    /// Converts the directory and its contents to a string with the given indentation.
+    ///
+    /// # Arguments
+    ///
+    /// * `indent` - A string slice that holds the current level of indentation.
+    /// * `prefix` - A string slice that holds the prefix to be used for each line.
+    ///
+    /// # Returns
+    ///
+    /// A `String` representation of the directory and its contents.
     pub fn to_string(&self, indent: &str) -> String {
         let mut ret: String = String::new();
 
@@ -49,12 +82,26 @@ impl Directory {
 }
 
 impl Node for Directory {
+    /// Returns the name of the directory.
+    ///
+    /// # Returns
+    ///
+    /// A string slice that holds the name of the directory.
     fn name(&self) -> &str {
         &self.name
     }
 }
 
 impl Serialize for Directory {
+    /// Serializes the directory and its contents.
+    ///
+    /// # Arguments
+    ///
+    /// * `serializer` - The serializer to use for serialization.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the serialized output or an error.
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
