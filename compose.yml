@@ -1,0 +1,27 @@
+services:
+  tree-ftp:
+    container_name: tree-ftp
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      alpine-ftp-server:
+        condition: service_started
+    environment:
+      - RUST_LOG=debug
+    network_mode: host
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+
+  alpine-ftp-server:
+    container_name: alpine-ftp-server
+    image: delfer/alpine-ftp-server
+    ports:
+      - "21:21"
+      - "21000-21010:21000-21010"
+    environment:
+      USERS: "${FTP_USER}|${FTP_PASSWORD}|/home/${FTP_USER}|1000"
+    volumes:
+      - ftpdata:/home
+
+volumes:
+  ftpdata: {}
