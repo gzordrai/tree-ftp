@@ -25,6 +25,10 @@ WORKDIR /app
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /usr/src/tree-ftp/target/release/tree-ftp /usr/local/bin/tree-ftp
+COPY --from=builder /usr/src/tree-ftp/docker-entrypoint.sh /usr/local/bin/
+
+# Set the entrypoint script as executable
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Set the default command
-ENTRYPOINT ["tree-ftp"]
+ENTRYPOINT ["docker-entrypoint.sh"]
