@@ -10,8 +10,8 @@ use fs::node::NodeEnum;
 use ftp::client::FtpClient;
 use log::info;
 use serde_json::to_string;
-use std::env;
-use utils::{parser::Args, validator::DomainAllowPort};
+use std::{env, net::SocketAddr};
+use utils::{domain::resolve_domain_to_socket_addr, parser::Args, validator::DomainAllowPort};
 use validators::traits::ValidateString;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,14 +25,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Debug level: {}", debug_level);
 
     let args: Args = Args::parse();
-    let parsed_addr: DomainAllowPort = DomainAllowPort::parse_str(&args.address).unwrap();
-    let addr_with_port: String = if let Some(port) = parsed_addr.port {
-        format!("{}:{}", parsed_addr.domain, port)
-    } else {
-        format!("{}:21", parsed_addr.domain)
-    };
-
-    let mut client: FtpClient = FtpClient::new(&addr_with_port)?;
+    let domain: DomainAllowPort = DomainAllowPort::parse_str(&args.address).unwrap();
+    let socket_addr: SocketAddr = resolve_domain_to_socket_addr(&domain)?;
+    let mut client: FtpClient = FtpClient::new(socket_addr)?;
 
     client.authenticate(&args.username, &args.password)?;
     client.retrieve_server_info()?;
