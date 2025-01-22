@@ -5,21 +5,26 @@ use log::{debug, info};
 use crate::{
     fs::{directory::Directory, file::File, node::NodeEnum},
     ftp::{
-        command::FtpCommand, command_stream::CommandStream, data_stream::FtpDataStream,
-        error::Result,
+        command::FtpCommand, command_stream::CommandStream, data_stream::DataStream, error::Result,
     },
 };
+
+use super::stream::Stream;
 
 pub struct FtpClient {
     data_addr: Option<SocketAddr>,
     ftp_stream: CommandStream,
-    ftp_data_stream: Option<FtpDataStream>,
+    ftp_data_stream: Option<DataStream>,
 }
 
 impl FtpClient {
     pub fn new(addr: SocketAddr) -> Result<Self> {
         let mut ftp_stream: CommandStream = CommandStream::new(addr)?;
-        let response: String = ftp_stream.read_response()?;
+        let response: String = ftp_stream
+            .read_responses()?
+            .get(0)
+            .ok_or("No response received")?
+            .to_string();
 
         info!("Server response: {}", response);
 
@@ -60,44 +65,66 @@ impl FtpClient {
     }
 
     pub fn passive_mode(&mut self) -> Result<()> {
-        info!("Entering passive mode");
+        debug!("Entering passive mode");
 
         self.ftp_stream
             .send_command(FtpCommand::Type("I".to_string()))?;
-        let response: String = self.ftp_stream.send_command(FtpCommand::Pasv)?;
+        let mut responses: Vec<String> = self.ftp_stream.send_command(FtpCommand::Epsv)?;
 
-        info!("Passive mode entered");
-        debug!("Parsing passive mode response: {}", response);
+        debug!("Passive mode entered");
 
-        let addr: SocketAddr = FtpClient::parse_passive_mode_response(self, response)?;
+        let response: String = responses.pop().ok_or("No response received")?;
+        let addr: SocketAddr = FtpClient::parse_passive_mode_response(self, response, true)?;
+
         self.data_addr = Some(addr.clone());
 
         debug!("Connecting to data client at {}", addr);
 
-        self.ftp_data_stream = Some(FtpDataStream::new(addr)?);
+        self.ftp_data_stream = Some(DataStream::new(addr)?);
 
         Ok(())
     }
 
-    fn parse_passive_mode_response(&mut self, res: String) -> Result<SocketAddr> {
+    fn parse_passive_mode_response(&mut self, res: String, extented: bool) -> Result<SocketAddr> {
+        debug!("Parsing passive mode response: {}", res);
+
         if let Some(start) = res.find('(') {
             if let Some(end) = res.find(')') {
                 let content: &str = &res[start + 1..end];
-                let parts: Vec<&str> = content.split(',').collect();
+                let parts: Vec<&str>;
 
-                if parts.len() < 6 {
-                    return Err("Invalid data in passive mode response".into());
+                if extented {
+                    debug!("Parsing extended passive mode");
+
+                    parts = content.split('|').collect();
+
+                    if parts.len() != 5 {
+                        return Err("Invalid data in extended passive mode response".into());
+                    }
+
+                    let ip: IpAddr = self.ftp_stream.get_addr().ip();
+                    let port: u16 = parts[3].parse::<u16>()?;
+
+                    return Ok(SocketAddr::new(ip, port));
+                } else {
+                    debug!("Parsing passive mode");
+
+                    parts = content.split(',').collect();
+
+                    if parts.len() < 6 {
+                        return Err("Invalid data in passive mode response".into());
+                    }
+
+                    let ip: Ipv4Addr = Ipv4Addr::new(
+                        parts[0].parse()?,
+                        parts[1].parse()?,
+                        parts[2].parse()?,
+                        parts[3].parse()?,
+                    );
+                    let port: u16 = parts[4].parse::<u16>()? * 256 + parts[5].parse::<u16>()?;
+
+                    return Ok(SocketAddr::new(IpAddr::V4(ip), port));
                 }
-
-                let ip = Ipv4Addr::new(
-                    parts[0].parse()?,
-                    parts[1].parse()?,
-                    parts[2].parse()?,
-                    parts[3].parse()?,
-                );
-                let port = parts[4].parse::<u16>()? * 256 + parts[5].parse::<u16>()?;
-
-                return Ok(SocketAddr::new(IpAddr::V4(ip), port));
             } else {
                 return Err("Closing parenthesis not found in passive mode response".into());
             }
@@ -116,9 +143,10 @@ impl FtpClient {
         }
 
         self.ftp_stream.send_command(FtpCommand::List)?;
-        self.ftp_stream.read_response()?;
+        self.ftp_stream.read_responses()?;
 
-        let response_lines: Vec<String> = self.ftp_data_stream.as_mut().unwrap().read_response()?;
+        let response_lines: Vec<String> =
+            self.ftp_data_stream.as_mut().unwrap().read_responses()?;
         let mut root: Directory = Directory::new(String::from("."));
 
         for line in response_lines {
@@ -155,8 +183,9 @@ impl FtpClient {
         self.ftp_stream.send_command(FtpCommand::Cwd(dir_name))?;
         self.passive_mode()?;
         self.ftp_stream.send_command(FtpCommand::List)?;
-        self.ftp_stream.read_response()?;
-        let response_lines: Vec<String> = self.ftp_data_stream.as_mut().unwrap().read_response()?;
+        self.ftp_stream.read_responses()?;
+        let response_lines: Vec<String> =
+            self.ftp_data_stream.as_mut().unwrap().read_responses()?;
 
         for line in response_lines {
             let node_name: String = Self::get_file_name(&line);
