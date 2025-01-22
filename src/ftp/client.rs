@@ -60,6 +60,8 @@ impl FtpClient {
         self.ftp_stream.send_command(FtpCommand::Syst)?;
         self.ftp_stream.send_command(FtpCommand::Feat)?;
         self.ftp_stream.send_command(FtpCommand::Pwd)?;
+        self.ftp_stream
+            .send_command(FtpCommand::Type("I".to_string()))?;
 
         info!("Server information retrieved");
 
@@ -67,9 +69,6 @@ impl FtpClient {
     }
 
     pub fn passive_mode(&mut self) -> Result<()> {
-        self.ftp_stream
-            .send_command(FtpCommand::Type("I".to_string()))?;
-
         let command: FtpCommand = if self.extended {
             debug!("Entering in extended passive mode");
 
@@ -151,6 +150,7 @@ impl FtpClient {
         self.passive_mode()?;
 
         self.ftp_stream.send_command(FtpCommand::List)?;
+        self.ftp_stream.read_responses()?;
 
         let response_lines: Vec<String> =
             self.ftp_data_stream.as_mut().unwrap().read_responses()?;
@@ -188,9 +188,12 @@ impl FtpClient {
         }
 
         self.ftp_stream.send_command(FtpCommand::Cwd(dir_name))?;
+
         self.passive_mode()?;
+
         self.ftp_stream.send_command(FtpCommand::List)?;
         self.ftp_stream.read_responses()?;
+
         let response_lines: Vec<String> =
             self.ftp_data_stream.as_mut().unwrap().read_responses()?;
 
