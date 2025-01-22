@@ -6,6 +6,7 @@ pub enum FtpCommand {
     Pwd,
     Type(String),
     Pasv,
+    Epsv,
     List,
     Cwd(String),
     Cdup
