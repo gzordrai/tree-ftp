@@ -12,13 +12,14 @@ use crate::{
 use super::stream::Stream;
 
 pub struct FtpClient {
+    extended: bool,
     data_addr: Option<SocketAddr>,
     ftp_stream: CommandStream,
     ftp_data_stream: Option<DataStream>,
 }
 
 impl FtpClient {
-    pub fn new(addr: SocketAddr) -> Result<Self> {
+    pub fn new(addr: SocketAddr, extended: bool) -> Result<Self> {
         let mut ftp_stream: CommandStream = CommandStream::new(addr)?;
         let response: String = ftp_stream
             .read_responses()?
@@ -29,6 +30,7 @@ impl FtpClient {
         info!("Server response: {}", response);
 
         Ok(FtpClient {
+            extended,
             data_addr: None,
             ftp_stream: ftp_stream,
             ftp_data_stream: None,
@@ -65,16 +67,24 @@ impl FtpClient {
     }
 
     pub fn passive_mode(&mut self) -> Result<()> {
-        debug!("Entering passive mode");
-
         self.ftp_stream
             .send_command(FtpCommand::Type("I".to_string()))?;
-        let mut responses: Vec<String> = self.ftp_stream.send_command(FtpCommand::Epsv)?;
+
+        let command: FtpCommand = if self.extended {
+            debug!("Entering in extended passive mode");
+
+            FtpCommand::Epsv
+        } else {
+            debug!("Entering in passive mode");
+
+            FtpCommand::Pasv
+        };
+        let mut responses: Vec<String> = self.ftp_stream.send_command(command)?;
 
         debug!("Passive mode entered");
 
         let response: String = responses.pop().ok_or("No response received")?;
-        let addr: SocketAddr = FtpClient::parse_passive_mode_response(self, response, true)?;
+        let addr: SocketAddr = FtpClient::parse_passive_mode_response(self, response)?;
 
         self.data_addr = Some(addr.clone());
 
@@ -85,7 +95,7 @@ impl FtpClient {
         Ok(())
     }
 
-    fn parse_passive_mode_response(&mut self, res: String, extented: bool) -> Result<SocketAddr> {
+    fn parse_passive_mode_response(&mut self, res: String) -> Result<SocketAddr> {
         debug!("Parsing passive mode response: {}", res);
 
         if let Some(start) = res.find('(') {
@@ -93,7 +103,7 @@ impl FtpClient {
                 let content: &str = &res[start + 1..end];
                 let parts: Vec<&str>;
 
-                if extented {
+                if self.extended {
                     debug!("Parsing extended passive mode");
 
                     parts = content.split('|').collect();
@@ -138,19 +148,16 @@ impl FtpClient {
     }
 
     pub fn list_dir(&mut self, depth: usize) -> Result<NodeEnum> {
-        if self.ftp_data_stream.is_none() {
-            self.passive_mode()?;
-        }
+        self.passive_mode()?;
 
         self.ftp_stream.send_command(FtpCommand::List)?;
-        self.ftp_stream.read_responses()?;
 
         let response_lines: Vec<String> =
             self.ftp_data_stream.as_mut().unwrap().read_responses()?;
         let mut root: Directory = Directory::new(String::from("."));
 
         for line in response_lines {
-            let node_name: String = Self::get_file_name(&line);
+            let node_name: String = Self::parse_filename(&line);
 
             if line.chars().next() == Some('d') {
                 let mut subdir: Directory = Directory::new(node_name.clone());
@@ -165,7 +172,7 @@ impl FtpClient {
         Ok(NodeEnum::Directory(root))
     }
 
-    fn get_file_name(line: &str) -> String {
+    fn parse_filename(line: &str) -> String {
         let parts: Vec<&str> = line.split_whitespace().collect();
 
         if parts.len() < 9 {
@@ -188,7 +195,7 @@ impl FtpClient {
             self.ftp_data_stream.as_mut().unwrap().read_responses()?;
 
         for line in response_lines {
-            let node_name: String = Self::get_file_name(&line);
+            let node_name: String = Self::parse_filename(&line);
 
             if line.chars().next() == Some('d') {
                 let mut subdir: Directory = Directory::new(node_name.clone());

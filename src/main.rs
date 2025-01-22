@@ -27,11 +27,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Args = Args::parse();
     let domain: DomainAllowPort = DomainAllowPort::parse_str(&args.address).unwrap();
     let socket_addr: SocketAddr = resolve_domain_to_socket_addr(&domain)?;
-    let mut client: FtpClient = FtpClient::new(socket_addr)?;
+    let mut client: FtpClient = FtpClient::new(socket_addr, args.extended)?;
 
     client.authenticate(&args.username, &args.password)?;
     client.retrieve_server_info()?;
-    client.passive_mode()?;
 
     let root: NodeEnum = client.list_dir(args.depth)?;
 
