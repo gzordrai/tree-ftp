@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use log::{debug, info};
 
@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub struct FtpClient {
-    data_addr: Option<String>,
+    data_addr: Option<SocketAddr>,
     ftp_stream: CommandStream,
     ftp_data_stream: Option<FtpDataStream>,
 }
@@ -69,17 +69,17 @@ impl FtpClient {
         info!("Passive mode entered");
         debug!("Parsing passive mode response: {}", response);
 
-        let addr: String = FtpClient::parse_passive_mode_response(self, response)?;
+        let addr: SocketAddr = FtpClient::parse_passive_mode_response(self, response)?;
         self.data_addr = Some(addr.clone());
 
         debug!("Connecting to data client at {}", addr);
 
-        self.ftp_data_stream = Some(FtpDataStream::new(&addr)?);
+        self.ftp_data_stream = Some(FtpDataStream::new(addr)?);
 
         Ok(())
     }
 
-    fn parse_passive_mode_response(&mut self, res: String) -> Result<String> {
+    fn parse_passive_mode_response(&mut self, res: String) -> Result<SocketAddr> {
         if let Some(start) = res.find('(') {
             if let Some(end) = res.find(')') {
                 let content: &str = &res[start + 1..end];
@@ -89,17 +89,22 @@ impl FtpClient {
                     return Err("Invalid data in passive mode response".into());
                 }
 
-                let ip = format!("{}.{}.{}.{}", parts[0], parts[1], parts[2], parts[3]);
+                let ip = Ipv4Addr::new(
+                    parts[0].parse()?,
+                    parts[1].parse()?,
+                    parts[2].parse()?,
+                    parts[3].parse()?,
+                );
                 let port = parts[4].parse::<u16>()? * 256 + parts[5].parse::<u16>()?;
 
-                return Ok(format!("{}:{}", ip, port));
+                return Ok(SocketAddr::new(IpAddr::V4(ip), port));
             } else {
                 return Err("Closing parenthesis not found in passive mode response".into());
             }
         }
 
-        if self.data_addr.is_some() {
-            return Ok(self.data_addr.clone().unwrap());
+        if let Some(addr) = self.data_addr {
+            return Ok(addr);
         }
 
         Err("Opening parenthesis not found in passive mode response".into())

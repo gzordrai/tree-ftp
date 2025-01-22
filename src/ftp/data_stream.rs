@@ -1,6 +1,6 @@
 use std::{
     io::{BufRead, BufReader},
-    net::TcpStream,
+    net::{SocketAddr, TcpStream},
 };
 
 use log::{debug, info};
@@ -9,16 +9,17 @@ use crate::ftp::error::Result;
 use super::reconnectable::Reconnectable;
 
 pub struct FtpDataStream {
+    addr: SocketAddr,
     stream: TcpStream,
 }
 
 impl FtpDataStream {
-    pub fn new(addr: &str) -> Result<Self> {
+    pub fn new(addr: SocketAddr) -> Result<Self> {
         let stream: TcpStream = TcpStream::connect(addr)?;
 
-        info!("Connected to the data server");
+        info!("Connected to the server");
 
-        Ok(FtpDataStream { stream })
+        Ok(FtpDataStream { addr, stream })
     }
 
     pub fn read_response(&mut self) -> Result<Vec<String>> {
@@ -45,8 +46,9 @@ impl FtpDataStream {
 }
 
 impl Reconnectable for FtpDataStream {
-    fn reconnect(&mut self) -> crate::ftp::error::Result<()> {
-        // Implement the reconnect logic for FtpDataStream
+    fn reconnect(&mut self) -> Result<()> {
+        
+
         Ok(())
     }
 }
