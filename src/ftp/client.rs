@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use log::{debug, info};
 
 use crate::{
@@ -15,7 +17,7 @@ pub struct FtpClient {
 }
 
 impl FtpClient {
-    pub fn new(addr: &str) -> Result<Self> {
+    pub fn new(addr: SocketAddr) -> Result<Self> {
         let mut ftp_stream: CommandStream = CommandStream::new(addr)?;
         let response: String = ftp_stream.read_response()?;
 
@@ -26,6 +28,10 @@ impl FtpClient {
             ftp_stream: ftp_stream,
             ftp_data_stream: None,
         })
+    }
+
+    fn reconnect(&mut self) -> Result<()> {
+        Ok(())
     }
 
     pub fn authenticate(&mut self, username: &str, password: &str) -> Result<()> {

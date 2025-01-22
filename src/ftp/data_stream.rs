@@ -6,6 +6,8 @@ use std::{
 use log::{debug, info};
 use crate::ftp::error::Result;
 
+use super::reconnectable::Reconnectable;
+
 pub struct FtpDataStream {
     stream: TcpStream,
 }
@@ -39,5 +41,12 @@ impl FtpDataStream {
         debug!("Full response: {:?}", response_lines);
 
         Ok(response_lines)
+    }
+}
+
+impl Reconnectable for FtpDataStream {
+    fn reconnect(&mut self) -> crate::ftp::error::Result<()> {
+        // Implement the reconnect logic for FtpDataStream
+        Ok(())
     }
 }

@@ -1,20 +1,25 @@
 use std::{
-    io::{BufRead, BufReader, Write}, net::TcpStream
+    io::{BufRead, BufReader, Write}, net::{SocketAddr, TcpStream}
 };
 
-use log::{debug, info};
+use log::{debug, error, info};
 use crate::ftp::error::Result;
 use crate::ftp::command::FtpCommand;
 
+use super::reconnectable::Reconnectable;
+
 pub struct CommandStream {
+    addr: SocketAddr,
     stream: TcpStream,
 }
 
 impl CommandStream {
-    pub fn new(addr: &str) -> Result<Self> {
+    pub fn new(addr: SocketAddr) -> Result<Self> {
         let stream: TcpStream = TcpStream::connect(addr)?;
+
         info!("Connected to the server");
-        Ok(CommandStream { stream })
+
+        Ok(CommandStream { addr, stream })
     }
 
     pub fn read_response(&mut self) -> Result<String> {
@@ -61,11 +66,31 @@ impl CommandStream {
 
         debug!("Sending command: {}", command_str.trim_end());
 
-        self.stream.write(command_str.as_bytes())?;
-        self.stream.flush()?;
+        match self.stream.write(command_str.as_bytes()) {
+            Ok(_) => self.stream.flush()?,
+            Err(e) => {
+                error!("{}", e);
+
+                self.reconnect()?;
+                self.stream.write(command_str.as_bytes())?;
+                self.stream.flush()?;
+            }
+        }
 
         debug!("Command flushed: {}", command_str.trim_end());
 
         self.read_response()
+    }
+}
+
+impl Reconnectable for CommandStream {
+    fn reconnect(&mut self) -> Result<()> {
+        let _ = &self.stream;
+
+        self.stream = TcpStream::connect(self.addr)?;
+
+        info!("Reconnected to the server at {}", self.addr);
+
+        Ok(())
     }
 }
