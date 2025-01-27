@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub enum FtpCommand {
     User(String),
     Pass(String),
