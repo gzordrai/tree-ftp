@@ -21,7 +21,12 @@ pub struct FtpClient {
 }
 
 impl FtpClient {
-    pub fn new(addr: SocketAddr, username: &String, password: &String, extended: bool) -> Result<Self> {
+    pub fn new(
+        addr: SocketAddr,
+        username: &String,
+        password: &String,
+        extended: bool,
+    ) -> Result<Self> {
         let mut ftp_stream: CommandStream = CommandStream::new(addr)?;
         let response: Responses = ftp_stream.read_responses()?;
 
@@ -146,18 +151,18 @@ impl FtpClient {
     pub fn list_dir(&mut self, depth: usize) -> Result<NodeEnum> {
         let username: String = self.username.clone();
         let password: String = self.password.clone();
-    
+
         self.authenticate(&username, &password)?;
         self.retrieve_server_info()?;
         self.passive_mode()?;
-    
+
         self.ftp_stream.send_command(FtpCommand::List)?;
-    
+
         let responses: Responses = self.ftp_data_stream.as_mut().unwrap().read_responses()?;
         let mut root: Directory = Directory::new(String::from("."));
-    
+
         self.process_responses(responses, &mut root, depth)?;
-    
+
         if self.ftp_stream.is_reconnected() {
             self.ftp_stream.set_reconnected(false);
             self.list_dir(depth)
@@ -165,60 +170,65 @@ impl FtpClient {
             Ok(NodeEnum::Directory(root))
         }
     }
-    
-    fn process_responses(&mut self, responses: Responses, dir: &mut Directory, depth: usize) -> Result<()> {
+
+    fn process_responses(
+        &mut self,
+        responses: Responses,
+        dir: &mut Directory,
+        depth: usize,
+    ) -> Result<()> {
         for response in responses {
             if self.ftp_stream.is_reconnected() {
                 return Ok(());
             }
-    
+
             let (code, line) = response;
             let node_name: String = Self::parse_filename(&line);
-    
+
             if line.chars().next() == Some('d') {
                 let mut subdir: Directory = Directory::new(node_name.clone());
-    
+
                 if code < 500 && depth > 0 {
                     self.populate_dir(node_name.clone(), &mut subdir, depth - 1)?;
                 }
-    
+
                 dir.add(subdir);
             } else {
                 dir.add(File::new(node_name));
             }
         }
-    
+
         Ok(())
     }
-    
+
     fn parse_filename(line: &str) -> String {
         let parts: Vec<&str> = line.split_whitespace().collect();
-    
+
         if parts.len() < 9 {
             String::new()
         } else {
             parts[8..].join(" ")
         }
     }
-    
+
     fn populate_dir(&mut self, dir_name: String, dir: &mut Directory, depth: usize) -> Result<()> {
         if depth == 0 || self.ftp_stream.is_reconnected() {
             return Ok(());
         }
-    
+
         self.ftp_stream.send_command(FtpCommand::Cwd(dir_name))?;
         self.passive_mode()?;
         self.ftp_stream.send_command(FtpCommand::List)?;
-    
+
         if self.ftp_stream.is_reconnected() {
             return Ok(());
         }
-    
+
         let responses: Responses = self.ftp_data_stream.as_mut().unwrap().read_responses()?;
         self.process_responses(responses, dir, depth)?;
-    
+
         self.ftp_stream.send_command(FtpCommand::Cdup)?;
-    
+
         Ok(())
     }
 }
