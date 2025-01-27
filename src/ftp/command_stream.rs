@@ -46,7 +46,7 @@ impl CommandStream {
         match self.stream.write(command_str.as_bytes()) {
             Ok(_) => self.stream.flush()?,
             Err(e) => {
-                error!("{}", e);
+                error!("Error writing command: {}. Attempting to reconnect...", e);
 
                 self.reconnect()?;
 
