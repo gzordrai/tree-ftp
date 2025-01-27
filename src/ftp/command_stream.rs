@@ -6,7 +6,7 @@ use std::{
 use log::{debug, error, info};
 use crate::ftp::error::Result;
 use crate::ftp::command::FtpCommand;
-use super::stream::Stream;
+use super::stream::{Responses, Stream};
 
 pub struct CommandStream {
     addr: SocketAddr,
@@ -38,7 +38,7 @@ impl CommandStream {
         }
     }
 
-    pub fn send_command(&mut self, cmd: FtpCommand) -> Result<Vec<String>> {
+    pub fn send_command(&mut self, cmd: FtpCommand) -> Result<Responses> {
         let command_str: String = CommandStream::format_command(cmd);
 
         debug!("Sending command: {}", command_str.trim_end());

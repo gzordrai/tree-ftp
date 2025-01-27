@@ -7,6 +7,9 @@ use crate::ftp::error::Result;
 use log::debug;
 use std::io::{BufRead, BufReader};
 
+pub type Response = (u16, String);
+pub type Responses = Vec<Response>;
+
 pub trait Stream {
     fn get_stream(&self) -> &TcpStream;
     fn get_addr(&self) -> SocketAddr;
@@ -39,10 +42,10 @@ pub trait Stream {
         Err("Failed to reconnect to the server".into())
     }
 
-    fn read_responses(&mut self) -> Result<Vec<String>> {
+    fn read_responses(&mut self) -> Result<Vec<Response>> {
         let stream: &TcpStream = self.get_stream();
         let mut reader: BufReader<&TcpStream> = BufReader::new(stream);
-        let mut response_lines: Vec<String> = Vec::new();
+        let mut responses: Vec<Response> = Vec::new();
 
         loop {
             let mut line: String = String::new();
@@ -50,9 +53,7 @@ pub trait Stream {
                 Ok(bytes_read) => bytes_read,
                 Err(e) => {
                     error!("Error reading response: {}. Attempting to reconnect...", e);
-
                     self.reconnect()?;
-
                     reader = BufReader::new(self.get_stream());
                     reader.read_line(&mut line)?
                 }
@@ -64,15 +65,21 @@ pub trait Stream {
 
             debug!("Read line: {}", line.trim_end());
 
-            response_lines.push(line.trim_end().to_string());
+            let code = if line.len() >= 3 {
+                line[0..3].parse::<u16>().unwrap_or(0)
+            } else {
+                0
+            };
+
+            responses.push((code, line.trim_end().to_string()));
 
             if line.len() >= 4 && &line[3..4] == " " {
                 break;
             }
         }
 
-        debug!("Full response: {:?}", response_lines);
+        debug!("Full response: {:?}", responses);
 
-        Ok(response_lines)
+        Ok(responses)
     }
 }

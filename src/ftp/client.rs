@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-use super::stream::Stream;
+use super::stream::{Responses, Stream};
 
 pub struct FtpClient {
     extended: bool,
@@ -21,13 +21,10 @@ pub struct FtpClient {
 impl FtpClient {
     pub fn new(addr: SocketAddr, extended: bool) -> Result<Self> {
         let mut ftp_stream: CommandStream = CommandStream::new(addr)?;
-        let response: String = ftp_stream
-            .read_responses()?
-            .get(0)
-            .ok_or("No response received")?
-            .to_string();
+        let response: Responses = ftp_stream
+            .read_responses()?;
 
-        info!("Server response: {}", response);
+        info!("Server response: {:?}", response);
 
         Ok(FtpClient {
             extended,
@@ -35,10 +32,6 @@ impl FtpClient {
             ftp_stream: ftp_stream,
             ftp_data_stream: None,
         })
-    }
-
-    fn reconnect(&mut self) -> Result<()> {
-        Ok(())
     }
 
     pub fn authenticate(&mut self, username: &str, password: &str) -> Result<()> {
@@ -78,11 +71,11 @@ impl FtpClient {
 
             FtpCommand::Pasv
         };
-        let mut responses: Vec<String> = self.ftp_stream.send_command(command)?;
+        let mut responses = self.ftp_stream.send_command(command)?;
 
         debug!("Passive mode entered");
 
-        let response: String = responses.pop().ok_or("No response received")?;
+        let (_, response) = responses.pop().ok_or("No response received")?;
         let addr: SocketAddr = FtpClient::parse_passive_mode_response(self, response)?;
 
         self.data_addr = Some(addr.clone());
@@ -152,11 +145,11 @@ impl FtpClient {
         self.ftp_stream.send_command(FtpCommand::List)?;
         self.ftp_stream.read_responses()?;
 
-        let response_lines: Vec<String> =
-            self.ftp_data_stream.as_mut().unwrap().read_responses()?;
+        let responses = self.ftp_data_stream.as_mut().unwrap().read_responses()?;
         let mut root: Directory = Directory::new(String::from("."));
 
-        for line in response_lines {
+        for response in responses {
+            let (_, line) = response;
             let node_name: String = Self::parse_filename(&line);
 
             if line.chars().next() == Some('d') {
@@ -194,16 +187,19 @@ impl FtpClient {
         self.ftp_stream.send_command(FtpCommand::List)?;
         self.ftp_stream.read_responses()?;
 
-        let response_lines: Vec<String> =
-            self.ftp_data_stream.as_mut().unwrap().read_responses()?;
+        let responses: Responses = self.ftp_data_stream.as_mut().unwrap().read_responses()?;
 
-        for line in response_lines {
+        for response in responses {
+            let (code, line) = response;
             let node_name: String = Self::parse_filename(&line);
 
             if line.chars().next() == Some('d') {
                 let mut subdir: Directory = Directory::new(node_name.clone());
 
-                Self::populate_dir(self, node_name.clone(), &mut subdir, depth - 1)?;
+                if code < 500 {
+                    Self::populate_dir(self, node_name.clone(), &mut subdir, depth - 1)?;
+                }
+
                 dir.add(subdir);
             } else {
                 dir.add(File::new(node_name));
