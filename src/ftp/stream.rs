@@ -46,7 +46,17 @@ pub trait Stream {
 
         loop {
             let mut line: String = String::new();
-            let bytes_read: usize = reader.read_line(&mut line)?;
+            let bytes_read: usize = match reader.read_line(&mut line) {
+                Ok(bytes_read) => bytes_read,
+                Err(e) => {
+                    error!("Error reading response: {}. Attempting to reconnect...", e);
+
+                    self.reconnect()?;
+
+                    reader = BufReader::new(self.get_stream());
+                    reader.read_line(&mut line)?
+                }
+            };
 
             if bytes_read == 0 {
                 break;
