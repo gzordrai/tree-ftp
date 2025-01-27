@@ -3,14 +3,15 @@ use std::{
     net::{SocketAddr, TcpStream},
 };
 
-use log::{debug, error, info};
-use crate::ftp::error::Result;
-use crate::ftp::command::FtpCommand;
 use super::stream::{Responses, Stream};
+use crate::ftp::command::FtpCommand;
+use crate::ftp::error::Result;
+use log::{debug, error, info};
 
 pub struct CommandStream {
     addr: SocketAddr,
     stream: TcpStream,
+    reconnected: bool,
 }
 
 impl CommandStream {
@@ -19,7 +20,11 @@ impl CommandStream {
 
         info!("Connected to the server");
 
-        Ok(CommandStream { addr, stream })
+        Ok(CommandStream {
+            addr,
+            stream,
+            reconnected: false,
+        })
     }
 
     fn format_command(cmd: FtpCommand) -> String {
@@ -34,30 +39,44 @@ impl CommandStream {
             FtpCommand::Epsv => "EPSV\r\n".to_string(),
             FtpCommand::List => "LIST\r\n".to_string(),
             FtpCommand::Cwd(path) => format!("CWD {}\r\n", path),
-            FtpCommand::Cdup => "CDUP\r\n".to_string()
+            FtpCommand::Cdup => "CDUP\r\n".to_string(),
         }
     }
 
     pub fn send_command(&mut self, cmd: FtpCommand) -> Result<Responses> {
-        let command_str: String = CommandStream::format_command(cmd);
+        let command_str: String = CommandStream::format_command(cmd.clone());
 
         debug!("Sending command: {}", command_str.trim_end());
 
         match self.stream.write(command_str.as_bytes()) {
-            Ok(_) => self.stream.flush()?,
+            Ok(_) => {
+                self.stream.flush()?;
+
+                debug!("Command flushed: {}", command_str.trim_end());
+
+                match cmd {
+                    FtpCommand::List => {
+                        let mut responses: Responses = self.read_responses()?;
+
+                        if !self.is_reconnected() {
+                            let mut additional_responses: Responses = self.read_responses()?;
+
+                            responses.append(&mut additional_responses);
+                        }
+
+                        Ok(responses)
+                    }
+                    _ => Ok(self.read_responses()?),
+                }
+            }
             Err(e) => {
                 error!("Error writing command: {}. Attempting to reconnect...", e);
 
                 self.reconnect()?;
 
-                self.stream.write(command_str.as_bytes())?;
-                self.stream.flush()?;
+                Ok(Vec::new())
             }
         }
-
-        debug!("Command flushed: {}", command_str.trim_end());
-
-        Ok(self.read_responses()?)
     }
 }
 
@@ -72,5 +91,13 @@ impl Stream for CommandStream {
 
     fn set_stream(&mut self, stream: TcpStream) {
         self.stream = stream;
+    }
+
+    fn set_reconnected(&mut self, reconnected: bool) {
+        self.reconnected = reconnected;
+    }
+
+    fn is_reconnected(&mut self) -> bool {
+        return self.reconnected;
     }
 }
