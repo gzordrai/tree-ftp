@@ -7,7 +7,7 @@ use super::node::{Node, NodeEnum};
 ///
 /// A `Directory` contains a name and a list of nodes, which can be either
 /// subdirectories or files.
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Directory {
     /// The name of the directory.
     pub name: String,

@@ -5,7 +5,7 @@ use super::node::Node;
 /// Represents a file in the filesystem.
 ///
 /// A `File` contains a name.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct File {
     /// The name of the file.
     pub name: String,

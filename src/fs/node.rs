@@ -16,7 +16,7 @@ pub trait Node {
 }
 
 /// An enum representing either a file or a directory in the filesystem.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub enum NodeEnum {
     /// A directory node.
     Directory(Directory),
