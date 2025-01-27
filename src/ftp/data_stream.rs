@@ -6,6 +6,7 @@ use std::net::{SocketAddr, TcpStream};
 pub struct DataStream {
     addr: SocketAddr,
     stream: TcpStream,
+    reconnected: bool,
 }
 
 impl DataStream {
@@ -14,7 +15,11 @@ impl DataStream {
 
         info!("Connected to the server");
 
-        Ok(DataStream { addr, stream })
+        Ok(DataStream {
+            addr,
+            stream,
+            reconnected: false,
+        })
     }
 }
 
@@ -29,5 +34,13 @@ impl Stream for DataStream {
 
     fn set_stream(&mut self, stream: TcpStream) {
         self.stream = stream;
+    }
+
+    fn set_reconnected(&mut self, reconnected: bool) {
+        self.reconnected = reconnected;
+    }
+
+    fn is_reconnected(&mut self) -> bool {
+        return self.reconnected;
     }
 }
