@@ -47,7 +47,6 @@ impl FtpClient {
 
         self.ftp_stream
             .send_command(FtpCommand::User(username.to_string()))?;
-        info!("OUIOUI");
         self.ftp_stream
             .send_command(FtpCommand::Pass(password.to_string()))?;
 
