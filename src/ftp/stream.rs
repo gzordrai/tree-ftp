@@ -14,12 +14,16 @@ pub trait Stream {
     fn get_stream(&self) -> &TcpStream;
     fn get_addr(&self) -> SocketAddr;
     fn set_stream(&mut self, stream: TcpStream);
+    fn set_reconnected(&mut self, reconnected: bool);
+    fn is_reconnected(&mut self) -> bool;
 
-    fn reconnect(&mut self) -> Result<()> {
+    fn reconnect(&mut self) -> Result<bool> {
         let addr: SocketAddr = self.get_addr();
         let start_time: Instant = Instant::now();
         let timeout: Duration = Duration::from_secs(300); // 5 minutes
         let retry_interval: Duration = Duration::from_secs(5); // Retry every 5 seconds
+
+        sleep(Duration::from_secs(5)); // For localhost docker ftp
 
         while start_time.elapsed() < timeout {
             match TcpStream::connect(addr) {
@@ -28,7 +32,10 @@ pub trait Stream {
 
                     info!("Reconnected to the server at {}", addr);
 
-                    return Ok(());
+                    self.set_reconnected(true);
+                    self.read_responses()?;
+
+                    return Ok(true);
                 },
                 Err(_) => {
                     error!("Failed to reconnect to the server at {}. Retrying in 5 seconds...", addr);
@@ -53,9 +60,10 @@ pub trait Stream {
                 Ok(bytes_read) => bytes_read,
                 Err(e) => {
                     error!("Error reading response: {}. Attempting to reconnect...", e);
+
                     self.reconnect()?;
-                    reader = BufReader::new(self.get_stream());
-                    reader.read_line(&mut line)?
+
+                    return Ok(Vec::new())
                 }
             };
 
