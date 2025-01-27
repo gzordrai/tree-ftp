@@ -1,4 +1,8 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::{
+    cell::RefCell,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    rc::Rc,
+};
 
 use log::{debug, info};
 
@@ -147,9 +151,9 @@ impl FtpClient {
         Err("Opening parenthesis not found in passive mode response".into())
     }
 
-    pub fn list_dir(&mut self, depth: usize) -> Result<NodeEnum> {
-        let username: String = self.username.clone();
-        let password: String = self.password.clone();
+    pub fn list_dir(&mut self, depth: usize, bfs: bool) -> Result<NodeEnum> {
+        let username = self.username.clone();
+        let password = self.password.clone();
 
         self.authenticate(&username, &password)?;
         self.retrieve_server_info()?;
@@ -157,20 +161,26 @@ impl FtpClient {
 
         self.ftp_stream.send_command(FtpCommand::List)?;
 
-        let responses: Responses = self.ftp_data_stream.as_mut().unwrap().read_responses()?;
-        let mut root: Directory = Directory::new(String::from("."));
+        let responses = self.ftp_data_stream.as_mut().unwrap().read_responses()?;
+        let mut root = Directory::new(String::from("."));
 
-        self.process_responses(responses, &mut root, depth)?;
+        if bfs {
+            debug!("BFS enabled");
+
+            self.process_responses_bfs(responses, &mut root, depth)?;
+        } else {
+            self.process_responses_dfs(responses, &mut root, depth)?;
+        }
 
         if self.ftp_stream.is_reconnected() {
             self.ftp_stream.set_reconnected(false);
-            self.list_dir(depth)
+            self.list_dir(depth, bfs)
         } else {
             Ok(NodeEnum::Directory(root))
         }
     }
 
-    fn process_responses(
+    fn process_responses_dfs(
         &mut self,
         responses: Responses,
         dir: &mut Directory,
@@ -182,13 +192,13 @@ impl FtpClient {
             }
 
             let (code, line) = response;
-            let node_name: String = Self::parse_filename(&line);
+            let node_name = Self::parse_filename(&line);
 
             if line.chars().next() == Some('d') {
-                let mut subdir: Directory = Directory::new(node_name.clone());
+                let mut subdir = Directory::new(node_name.clone());
 
                 if code < 500 && depth > 0 {
-                    self.populate_dir(node_name.clone(), &mut subdir, depth - 1)?;
+                    self.populate_dir_dfs(node_name.clone(), &mut subdir, depth - 1)?;
                 }
 
                 dir.add(subdir);
@@ -200,17 +210,57 @@ impl FtpClient {
         Ok(())
     }
 
-    fn parse_filename(line: &str) -> String {
-        let parts: Vec<&str> = line.split_whitespace().collect();
+    fn process_responses_bfs(
+        &mut self,
+        responses: Responses,
+        dir: &mut Directory,
+        depth: usize,
+    ) -> Result<()> {
+        let root: Rc<RefCell<Directory>> = Rc::new(RefCell::new(std::mem::take(dir)));
+        let mut queue: Vec<(Rc<RefCell<Directory>>, Vec<(u16, String)>, usize)> = vec![(root.clone(), responses, depth)];
 
-        if parts.len() < 9 {
-            String::new()
-        } else {
-            parts[8..].join(" ")
+        while let Some((current_dir, current_responses, current_depth)) = queue.pop() {
+            for response in current_responses {
+                if self.ftp_stream.is_reconnected() {
+                    return Ok(());
+                }
+
+                let (code, line) = response;
+                let node_name: String = Self::parse_filename(&line);
+
+                if line.chars().next() == Some('d') {
+                    let subdir: Rc<RefCell<Directory>> = Rc::new(RefCell::new(Directory::new(node_name.clone())));
+
+                    if code < 500 && current_depth > 0 {
+                        let subdir_responses = self.populate_dir_bfs(
+                            node_name.clone(),
+                            &mut subdir.borrow_mut(),
+                            current_depth - 1,
+                        )?;
+
+                        queue.push((subdir.clone(), subdir_responses, current_depth - 1));
+                    }
+
+                    current_dir 
+                        .borrow_mut()
+                        .add(NodeEnum::Directory((*subdir.borrow()).clone()));
+                } else {
+                    current_dir.borrow_mut().add(File::new(node_name));
+                }
+            }
         }
+
+        *dir = Rc::try_unwrap(root).unwrap().into_inner();
+
+        Ok(())
     }
 
-    fn populate_dir(&mut self, dir_name: String, dir: &mut Directory, depth: usize) -> Result<()> {
+    fn populate_dir_dfs(
+        &mut self,
+        dir_name: String,
+        dir: &mut Directory,
+        depth: usize,
+    ) -> Result<()> {
         if depth == 0 || self.ftp_stream.is_reconnected() {
             return Ok(());
         }
@@ -224,10 +274,46 @@ impl FtpClient {
         }
 
         let responses: Responses = self.ftp_data_stream.as_mut().unwrap().read_responses()?;
-        self.process_responses(responses, dir, depth)?;
+        self.process_responses_dfs(responses, dir, depth)?;
 
         self.ftp_stream.send_command(FtpCommand::Cdup)?;
 
         Ok(())
+    }
+
+    fn populate_dir_bfs(
+        &mut self,
+        dir_name: String,
+        dir: &mut Directory,
+        depth: usize,
+    ) -> Result<Responses> {
+        if depth == 0 || self.ftp_stream.is_reconnected() {
+            return Ok(vec![]);
+        }
+
+        self.ftp_stream.send_command(FtpCommand::Cwd(dir_name))?;
+        self.passive_mode()?;
+        self.ftp_stream.send_command(FtpCommand::List)?;
+
+        if self.ftp_stream.is_reconnected() {
+            return Ok(vec![]);
+        }
+
+        let responses = self.ftp_data_stream.as_mut().unwrap().read_responses()?;
+
+        self.process_responses_bfs(responses.clone(), dir, depth)?;
+        self.ftp_stream.send_command(FtpCommand::Cdup)?;
+
+        Ok(responses)
+    }
+
+    fn parse_filename(line: &str) -> String {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+
+        if parts.len() < 9 {
+            String::new()
+        } else {
+            parts[8..].join(" ")
+        }
     }
 }
