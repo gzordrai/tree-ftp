@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 
@@ -44,17 +46,16 @@ impl Directory {
         self.nodes.push(node.into());
     }
 
-    /// Converts the directory and its contents to a string with the given indentation.
+    /// Converts the directory and its contents to a string with the given indentation using DFS.
     ///
     /// # Arguments
     ///
     /// * `indent` - A string slice that holds the current level of indentation.
-    /// * `prefix` - A string slice that holds the prefix to be used for each line.
     ///
     /// # Returns
     ///
-    /// A `String` representation of the directory and its contents.
-    pub fn to_string(&self, indent: &str) -> String {
+    /// A `String` representation of the directory and its contents in DFS order.
+    pub fn to_string_dfs(&self, indent: &str) -> String {
         let mut ret: String = String::new();
 
         for (i, node) in self.nodes.iter().enumerate() {
@@ -66,9 +67,9 @@ impl Directory {
                     ret.push_str(&format!("{}{}{}\n", indent, prefix, directory.name()));
 
                     if is_last {
-                        ret.push_str(&directory.to_string(&format!("{}    ", indent)));
+                        ret.push_str(&directory.to_string_dfs(&format!("{}    ", indent)));
                     } else {
-                        ret.push_str(&directory.to_string(&format!("{}│    ", indent)));
+                        ret.push_str(&directory.to_string_dfs(&format!("{}│    ", indent)));
                     }
                 }
                 NodeEnum::File(file) => {
@@ -78,6 +79,53 @@ impl Directory {
         }
 
         ret
+    }
+
+    /// Converts the directory and its contents to a string with the given indentation using BFS.
+    ///
+    /// # Arguments
+    ///
+    /// * `indent` - A string slice that holds the current level of indentation.
+    ///
+    /// # Returns
+    ///
+    /// A `String` representation of the directory and its contents in BFS order.
+    pub fn to_string_bfs(&self, indent: &str) -> String {
+        let mut result: String = String::new();
+        let mut queue: VecDeque<(&Directory, String)> = VecDeque::new();
+
+        queue.push_back((self, indent.to_string()));
+
+        while let Some((current_dir, current_indent)) = queue.pop_front() {
+            for (i, node) in current_dir.nodes.iter().enumerate() {
+                let is_last: bool = i == current_dir.nodes.len() - 1;
+                let prefix: &str = if is_last { "└── " } else { "├── " };
+
+                match node {
+                    NodeEnum::Directory(subdir) => {
+                        result.push_str(&format!(
+                            "{}{}{}\n",
+                            current_indent,
+                            prefix,
+                            subdir.name()
+                        ));
+
+                        let new_indent = if is_last {
+                            format!("{}    ", current_indent)
+                        } else {
+                            format!("{}|   ", current_indent)
+                        };
+
+                        queue.push_back((subdir, new_indent));
+                    }
+                    NodeEnum::File(file) => {
+                        result.push_str(&format!("{}{}{}\n", current_indent, prefix, file.name()));
+                    }
+                }
+            }
+        }
+
+        result
     }
 }
 

@@ -3,6 +3,11 @@ use serde::Serialize;
 use super::directory::Directory;
 use super::file::File;
 
+pub enum TraversalType {
+    BFS,
+    DFS,
+}
+
 /// A trait representing a node in the filesystem.
 ///
 /// A node can be either a file or a directory.
@@ -35,9 +40,12 @@ impl NodeEnum {
     /// # Returns
     ///
     /// A `String` representation of the node.
-    pub fn to_string(&self, indent: &str) -> String {
+    pub fn to_string(&self, indent: &str, traversal_type: TraversalType) -> String {
         match self {
-            NodeEnum::Directory(dir) => format!(".\n{}", dir.to_string(indent)),
+            NodeEnum::Directory(dir) => match traversal_type {
+                TraversalType::BFS => dir.to_string_bfs(indent),
+                TraversalType::DFS => dir.to_string_dfs(indent),
+            },
             NodeEnum::File(file) => format!(".\n└── {}", file.name),
         }
     }
