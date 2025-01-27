@@ -20,13 +20,25 @@ fn test_directory_add() {
 }
 
 #[test]
-fn test_directory_to_string() {
+fn test_directory_to_string_dfs() {
     let mut dir: Directory = Directory::new("test_dir".to_string());
     let file: File = File::new("test_file".to_string());
 
     dir.add(file);
 
-    let dir_str: String = dir.to_string("");
+    let dir_str: String = dir.to_string_bfs("",);
+
+    assert!(dir_str.contains("test_file"));
+}
+
+#[test]
+fn test_directory_to_string_bfs() {
+    let mut dir: Directory = Directory::new("test_dir".to_string());
+    let file: File = File::new("test_file".to_string());
+
+    dir.add(file);
+
+    let dir_str: String = dir.to_string_dfs("");
 
     assert!(dir_str.contains("test_file"));
 }
