@@ -6,7 +6,7 @@ mod utils;
 
 use clap::Parser;
 use dotenv::dotenv;
-use fs::node::NodeEnum;
+use fs::node::{NodeEnum, TraversalType};
 use ftp::client::FtpClient;
 use log::info;
 use serde_json::to_string;
@@ -33,7 +33,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if args.json {
         println!("{}", to_string(&root).unwrap());
     } else {
-        println!("{}", root.to_string(""));
+        if args.bfs {
+            println!("{}", root.to_string("", TraversalType::BFS));
+        } else {
+            println!("{}", root.to_string("", TraversalType::DFS));
+        }
     }
 
     Ok(())
