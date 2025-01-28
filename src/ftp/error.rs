@@ -1,16 +1,19 @@
 use derive_more::From;
 
 pub type Result<T> = core::result::Result<T, Error>;
-// pub type Error = Box<dyn std::error::Error>;
-
 
 #[derive(Debug, From)]
 pub enum Error {
-    #[from]
     ReadError,
-
-    #[from]
     ReconnectError,
+    ConnectionError,
+    DomainResolutionError,
+    CommandWriteError,
+    CommandFlushError,
+    InvalidParsedData,
+    InvalidParsedIp,
+    InvalidParsedPort,
+    NoResponseReceived
 }
 
 impl core::fmt::Display for Error {
