@@ -86,11 +86,39 @@ impl FtpClient {
 
             FtpCommand::Pasv
         };
-        let mut responses = self.ftp_stream.send_command(command)?;
+        let mut responses: Responses = self.ftp_stream.send_command(command.clone())?;
 
         debug!("Passive mode entered");
 
-        let (_, response) = responses.pop().ok_or(Error::NoResponseReceived)?;
+        let response: String = loop {
+            let response = responses.pop().ok_or_else(|| {
+                self.ftp_stream
+                    .send_command(command.clone())?
+                    .pop()
+                    .ok_or(Error::NoResponseReceived)
+            });
+
+            match response {
+                Ok((_, response)) => {
+                    if !response.is_empty() {
+                        break response;
+                    } else {
+                        info!("Empty response received, retrying...");
+                        responses = self.ftp_stream.send_command(command.clone())?;
+                    }
+                }
+                Err(e) => {
+                    if let Err(Error::NoResponseReceived) = e {
+                        info!("No response received, attempting to reconnect...");
+                        self.ftp_stream.reconnect()?;
+                        responses = self.ftp_stream.send_command(command.clone())?;
+                    } else {
+                        return Err(e.unwrap_err());
+                    }
+                }
+            }
+        };
+
         let addr: SocketAddr = FtpClient::parse_passive_mode_response(self, response)?;
 
         self.data_addr = Some(addr.clone());

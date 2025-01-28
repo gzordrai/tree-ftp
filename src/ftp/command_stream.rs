@@ -70,11 +70,17 @@ impl CommandStream {
                 }
             }
             Err(e) => {
-                error!("Error writing command: {}. Attempting to reconnect...", e);
+                if let Some(10053) = e.raw_os_error() {
+                    error!("Connection was aborted by the software in your host machine. Attempting to reconnect...");
 
-                self.reconnect()?;
+                    self.reconnect()?;
 
-                Err(Error::CommandWriteError)
+                    return Ok(Vec::new());
+                } else {
+                    error!("Error writing command");
+                }
+
+                return Err(Error::CommandWriteError);
             }
         }
     }

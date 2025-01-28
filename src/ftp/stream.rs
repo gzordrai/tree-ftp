@@ -66,9 +66,13 @@ pub trait Stream {
             let bytes_read: usize = match reader.read_line(&mut line) {
                 Ok(bytes_read) => bytes_read,
                 Err(e) => {
-                    error!("Error reading response: {}. Attempting to reconnect...", e);
+                    if let Some(10053) = e.raw_os_error() {
+                        error!("Connection was aborted by the software in your host machine. Attempting to reconnect...");
 
-                    self.reconnect()?;
+                        self.reconnect()?;
+
+                        return Ok(Vec::new());
+                    }
 
                     return Err(Error::ReadError);
                 }
