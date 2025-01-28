@@ -66,7 +66,7 @@ pub trait Stream {
             let bytes_read: usize = match reader.read_line(&mut line) {
                 Ok(bytes_read) => bytes_read,
                 Err(e) => {
-                    if let Some(10053) = e.raw_os_error() {
+                    if let Some(10053) | Some(libc::ECONNABORTED) = e.raw_os_error() {
                         error!("Connection was aborted by the software in your host machine. Attempting to reconnect...");
 
                         self.reconnect()?;
