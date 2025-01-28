@@ -1,11 +1,11 @@
-use std::{net::{SocketAddr, TcpStream}, thread::sleep, time::{Duration, Instant}};
-
-use log::{error, info};
-
-
-use crate::ftp::error::Result;
-use log::debug;
+use crate::ftp::error::{Error, Result};
+use log::{debug, error, info};
 use std::io::{BufRead, BufReader};
+use std::{
+    net::{SocketAddr, TcpStream},
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
 pub type Response = (u16, String);
 pub type Responses = Vec<Response>;
@@ -36,17 +36,24 @@ pub trait Stream {
                     self.read_responses()?;
 
                     return Ok(true);
-                },
+                }
                 Err(_) => {
-                    error!("Failed to reconnect to the server at {}. Retrying in 5 seconds...", addr);
+                    error!(
+                        "Failed to reconnect to the server at {}. Retrying in 5 seconds...",
+                        addr
+                    );
 
                     sleep(retry_interval);
-                },
+                }
             }
         }
 
-        error!("Failed to reconnect to the server at {} after 5 minutes", addr);
-        Err("Failed to reconnect to the server".into())
+        error!(
+            "Failed to reconnect to the server at {} after 5 minutes",
+            addr
+        );
+
+        Err(Error::ReconnectError)
     }
 
     fn read_responses(&mut self) -> Result<Vec<Response>> {
@@ -63,7 +70,7 @@ pub trait Stream {
 
                     self.reconnect()?;
 
-                    return Ok(Vec::new())
+                    return Err(Error::ReadError);
                 }
             };
 
