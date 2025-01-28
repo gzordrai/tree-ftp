@@ -1,6 +1,6 @@
 use crate::ftp::error::{Error, Result};
 use crate::ftp::stream::Stream;
-use log::info;
+use log::debug;
 use std::net::{SocketAddr, TcpStream};
 
 pub struct DataStream {
@@ -14,7 +14,7 @@ impl DataStream {
         let stream: TcpStream = TcpStream::connect(addr)
             .map_err(|_| Error::ConnectionError)?;
 
-        info!("Connected to the server");
+        debug!("Connected to the data server");
 
         Ok(DataStream {
             addr,
