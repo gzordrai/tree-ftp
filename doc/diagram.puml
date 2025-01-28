@@ -1,0 +1,113 @@
+@startuml tree-ftp
+
+package "fs" {
+    class Directory {
+        +name: String
+        +nodes: Vec<NodeEnum>
+        +new(name: String) : Directory
+        +add(node: impl Into<NodeEnum>)
+        +to_string_dfs(indent: &str) : String
+        +to_string_bfs(indent: &str) : String
+    }
+
+    class File {
+        +name: String
+        +new(name: String) : File
+    }
+
+    class NodeEnum {
+        +Directory(Directory)
+        +File(File)
+        +name() : &str
+        +to_string(indent: &str, traversal_type: TraversalType) : String
+    }
+
+    class TraversalType {
+        +BFS
+        +DFS
+    }
+}
+
+package "ftp" {
+    class FtpClient {
+        +new(addr: SocketAddr, username: &String, password: &String, extended: bool) : Result<Self>
+        +authenticate(username: &String, password: &String) : Result<()>
+        +retrieve_server_info() : Result<()>
+        +passive_mode() : Result<()>
+        +list_dir(depth: usize, bfs: bool) : Result<NodeEnum>
+        +process_responses_dfs(responses: Responses, dir: &mut Directory, depth: usize) : Result<()>
+        +process_responses_bfs(responses: Responses, dir: &mut Directory, depth: usize) : Result<()>
+        +populate_dir_dfs(dir_name: String, dir: &mut Directory, depth: usize) : Result<()>
+        +populate_dir_bfs(dir_name: String, dir: &mut Directory, depth: usize) : Result<Responses>
+        +parse_filename(line: &str) : String
+    }
+
+    interface Stream {
+        +get_stream() : &TcpStream
+        +get_addr() : SocketAddr
+        +set_stream(stream: TcpStream)
+        +set_reconnected(reconnected: bool)
+        +is_reconnected() : bool
+        +reconnect() : Result<bool>
+        +read_responses() : Result<Vec<Response>>
+    }
+
+    class DataStream {
+        +new(addr: SocketAddr) : Result<Self>
+        +get_stream() : &TcpStream
+        +get_addr() : SocketAddr
+        +set_stream(stream: TcpStream)
+        +set_reconnected(reconnected: bool)
+        +is_reconnected() : bool
+    }
+
+    class CommandStream {
+        +new(addr: SocketAddr) : Result<Self>
+        +send_command(cmd: FtpCommand) : Result<Responses>
+        +get_stream() : &TcpStream
+        +get_addr() : SocketAddr
+        +set_stream(stream: TcpStream)
+        +set_reconnected(reconnected: bool)
+        +is_reconnected() : bool
+    }
+
+    Stream <|.. DataStream
+    Stream <|.. CommandStream
+    FtpClient --> CommandStream
+    FtpClient --> DataStream
+}
+
+package "utils" {
+    class Args {
+        +address: String
+        +username: String
+        +password: String
+        +extended: bool
+        +depth: usize
+        +bfs: bool
+        +json: bool
+    }
+
+    class DomainAllowPort {
+        +parse_str(address: &str) : Result<DomainAllowPort>
+    }
+
+    class Validator {
+        +validate_string(value: &str) : bool
+    }
+}
+
+class Main {
+    +main() : Result<(), Box<dyn std::error::Error>>
+}
+
+Main --> fs::Directory
+Main --> fs::File
+Main --> fs::NodeEnum
+Main --> fs::TraversalType
+Main --> ftp::FtpClient
+Main --> utils::Args
+Main --> utils::DomainAllowPort
+Main --> utils::Validator
+
+@enduml
