@@ -8,6 +8,7 @@ use crate::ftp::error::Result;
 use crate::ftp::{command::FtpCommand, error::Error};
 use log::{debug, error, info};
 
+/// Represents a command stream for FTP communication.
 pub struct CommandStream {
     addr: SocketAddr,
     stream: TcpStream,
@@ -15,6 +16,15 @@ pub struct CommandStream {
 }
 
 impl CommandStream {
+    /// Creates a new `CommandStream` and connects to the given address.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The socket address to connect to.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the new `CommandStream` or an `Error`.
     pub fn new(addr: SocketAddr) -> Result<Self> {
         let stream: TcpStream = TcpStream::connect(addr).map_err(|_| Error::ConnectionError)?;
 
@@ -27,6 +37,15 @@ impl CommandStream {
         })
     }
 
+    /// Formats an FTP command into a string.
+    ///
+    /// # Arguments
+    ///
+    /// * `cmd` - The FTP command to format.
+    ///
+    /// # Returns
+    ///
+    /// A formatted string representing the FTP command.
     fn format_command(cmd: FtpCommand) -> String {
         match cmd {
             FtpCommand::User(username) => format!("USER {}\r\n", username),
@@ -43,6 +62,15 @@ impl CommandStream {
         }
     }
 
+    /// Sends an FTP command to the server.
+    ///
+    /// # Arguments
+    ///
+    /// * `cmd` - The FTP command to send.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the server's responses or an `Error`.
     pub fn send_command(&mut self, cmd: FtpCommand) -> Result<Responses> {
         let command_str: String = CommandStream::format_command(cmd.clone());
 

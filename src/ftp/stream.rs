@@ -7,16 +7,42 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Represents a response from the FTP server.
 pub type Response = (u16, String);
+
+/// Represents multiple responses from the FTP server.
 pub type Responses = Vec<Response>;
 
+/// A trait for managing TCP streams in FTP operations.
 pub trait Stream {
+    /// Returns a reference to the TCP stream.
     fn get_stream(&self) -> &TcpStream;
+
+    /// Returns the address of the data stream.
     fn get_addr(&self) -> SocketAddr;
+
+    /// Sets the TCP stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `stream` - The new TCP stream.
     fn set_stream(&mut self, stream: TcpStream);
+
+    /// Sets the reconnected status.
+    ///
+    /// # Arguments
+    ///
+    /// * `reconnected` - The new reconnected status.
     fn set_reconnected(&mut self, reconnected: bool);
+
+    /// Returns whether the stream has been reconnected.
     fn is_reconnected(&mut self) -> bool;
 
+    /// Attempts to reconnect the TCP stream.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating whether the reconnection was successful.
     fn reconnect(&mut self) -> Result<bool> {
         let addr: SocketAddr = self.get_addr();
         let start_time: Instant = Instant::now();
@@ -56,6 +82,11 @@ pub trait Stream {
         Err(Error::ReconnectError)
     }
 
+    /// Reads responses from the TCP stream.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a vector of responses from the FTP server, or an `Error` if reading fails.
     fn read_responses(&mut self) -> Result<Vec<Response>> {
         let stream: &TcpStream = self.get_stream();
         let mut reader: BufReader<&TcpStream> = BufReader::new(stream);

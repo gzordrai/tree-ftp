@@ -18,6 +18,7 @@ use crate::{
 
 use super::stream::{Responses, Stream};
 
+/// Represents an FTP client for communicating with an FTP server.
 pub struct FtpClient {
     extended: bool,
     data_addr: Option<SocketAddr>,
@@ -28,6 +29,18 @@ pub struct FtpClient {
 }
 
 impl FtpClient {
+    /// Creates a new `FtpClient` and connects to the given address.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The socket address of the FTP server.
+    /// * `username` - The username for authentication.
+    /// * `password` - The password for authentication.
+    /// * `extended` - A boolean indicating whether to use extended passive mode.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the new `FtpClient` or an `Error`.
     pub fn new(
         addr: SocketAddr,
         username: &String,
@@ -49,6 +62,16 @@ impl FtpClient {
         })
     }
 
+    /// Authenticates the user with the provided username and password.
+    ///
+    /// # Arguments
+    ///
+    /// * `username` - The username for authentication.
+    /// * `password` - The password for authentication.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure.
     pub fn authenticate(&mut self, username: &String, password: &String) -> Result<()> {
         info!("Starting authentication");
 
@@ -62,6 +85,11 @@ impl FtpClient {
         Ok(())
     }
 
+    /// Retrieves server information by sending various FTP commands.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure.
     pub fn retrieve_server_info(&mut self) -> Result<()> {
         info!("Retrieving server information");
 
@@ -76,6 +104,11 @@ impl FtpClient {
         Ok(())
     }
 
+    /// Enters passive mode or extended passive mode based on the `extended` flag.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure.
     pub fn passive_mode(&mut self) -> Result<()> {
         let command: FtpCommand = if self.extended {
             debug!("Entering in extended passive mode");
@@ -130,6 +163,15 @@ impl FtpClient {
         Ok(())
     }
 
+    /// Parses the response from the server to determine the data connection address.
+    ///
+    /// # Arguments
+    ///
+    /// * `res` - The response string from the server.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the `SocketAddr` or an `Error`.
     fn parse_passive_mode_response(&mut self, res: String) -> Result<SocketAddr> {
         debug!("Parsing passive mode response: {}", res);
 
@@ -190,6 +232,16 @@ impl FtpClient {
         Err(Error::InvalidParsedData)
     }
 
+    /// Lists the directory contents up to a specified depth using either BFS or DFS.
+    ///
+    /// # Arguments
+    ///
+    /// * `depth` - The depth to which the directory contents should be listed.
+    /// * `bfs` - A boolean indicating whether to use BFS (true) or DFS (false).
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the root `NodeEnum` or an `Error`.
     pub fn list_dir(&mut self, depth: usize, bfs: bool) -> Result<NodeEnum> {
         let username = self.username.clone();
         let password = self.password.clone();
@@ -219,6 +271,17 @@ impl FtpClient {
         }
     }
 
+    /// Processes the responses using DFS and populates the directory up to a specified depth.
+    ///
+    /// # Arguments
+    ///
+    /// * `responses` - The responses from the server.
+    /// * `dir` - The directory to populate.
+    /// * `depth` - The depth to which the directory should be populated.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure.
     fn process_responses_dfs(
         &mut self,
         responses: Responses,
@@ -249,6 +312,17 @@ impl FtpClient {
         Ok(())
     }
 
+    /// Processes the responses using BFS and populates the directory up to a specified depth.
+    ///
+    /// # Arguments
+    ///
+    /// * `responses` - The responses from the server.
+    /// * `dir` - The directory to populate.
+    /// * `depth` - The depth to which the directory should be populated.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure.
     fn process_responses_bfs(
         &mut self,
         responses: Responses,
@@ -296,6 +370,17 @@ impl FtpClient {
         Ok(())
     }
 
+    /// Populates the directory using DFS up to a specified depth.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir_name` - The name of the directory to populate.
+    /// * `dir` - The directory to populate.
+    /// * `depth` - The depth to which the directory should be populated.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or failure.
     fn populate_dir_dfs(
         &mut self,
         dir_name: String,
@@ -322,6 +407,17 @@ impl FtpClient {
         Ok(())
     }
 
+    /// Populates the directory using BFS up to a specified depth.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir_name` - The name of the directory to populate.
+    /// * `dir` - The directory to populate.
+    /// * `depth` - The depth to which the directory should be populated.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the server's responses or an `Error`.
     fn populate_dir_bfs(
         &mut self,
         dir_name: String,
@@ -348,6 +444,15 @@ impl FtpClient {
         Ok(responses)
     }
 
+    /// Parses the filename from a response line.
+    ///
+    /// # Arguments
+    ///
+    /// * `line` - The response line containing the filename.
+    ///
+    /// # Returns
+    ///
+    /// A `String` containing the parsed filename.
     fn parse_filename(line: &str) -> String {
         let parts: Vec<&str> = line.split_whitespace().collect();
 

@@ -3,6 +3,7 @@ use crate::ftp::stream::Stream;
 use log::debug;
 use std::net::{SocketAddr, TcpStream};
 
+/// Represents a data stream for FTP communication.
 pub struct DataStream {
     addr: SocketAddr,
     stream: TcpStream,
@@ -10,9 +11,18 @@ pub struct DataStream {
 }
 
 impl DataStream {
+    /// Creates a new `DataStream`.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The address of the data stream.
+    /// * `stream` - The TCP stream used for communication.
+    ///
+    /// # Returns
+    ///
+    /// A new `DataStream` instance.
     pub fn new(addr: SocketAddr) -> Result<Self> {
-        let stream: TcpStream = TcpStream::connect(addr)
-            .map_err(|_| Error::ConnectionError)?;
+        let stream: TcpStream = TcpStream::connect(addr).map_err(|_| Error::ConnectionError)?;
 
         debug!("Connected to the data server");
 
