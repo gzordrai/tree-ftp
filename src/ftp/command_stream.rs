@@ -4,8 +4,8 @@ use std::{
 };
 
 use super::stream::{Responses, Stream};
-use crate::ftp::command::FtpCommand;
 use crate::ftp::error::Result;
+use crate::ftp::{command::FtpCommand, error::Error};
 use log::{debug, error, info};
 
 pub struct CommandStream {
@@ -16,7 +16,7 @@ pub struct CommandStream {
 
 impl CommandStream {
     pub fn new(addr: SocketAddr) -> Result<Self> {
-        let stream: TcpStream = TcpStream::connect(addr)?;
+        let stream: TcpStream = TcpStream::connect(addr).map_err(|_| Error::ConnectionError)?;
 
         info!("Connected to the server");
 
@@ -50,7 +50,7 @@ impl CommandStream {
 
         match self.stream.write(command_str.as_bytes()) {
             Ok(_) => {
-                self.stream.flush()?;
+                self.stream.flush().map_err(|_| Error::CommandFlushError)?;
 
                 debug!("Command flushed: {}", command_str.trim_end());
 
@@ -74,7 +74,7 @@ impl CommandStream {
 
                 self.reconnect()?;
 
-                Ok(Vec::new())
+                Err(Error::CommandWriteError)
             }
         }
     }
@@ -98,6 +98,6 @@ impl Stream for CommandStream {
     }
 
     fn is_reconnected(&mut self) -> bool {
-        return self.reconnected;
+        self.reconnected
     }
 }

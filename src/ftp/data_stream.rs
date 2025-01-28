@@ -1,4 +1,4 @@
-use crate::ftp::error::Result;
+use crate::ftp::error::{Error, Result};
 use crate::ftp::stream::Stream;
 use log::info;
 use std::net::{SocketAddr, TcpStream};
@@ -11,7 +11,8 @@ pub struct DataStream {
 
 impl DataStream {
     pub fn new(addr: SocketAddr) -> Result<Self> {
-        let stream: TcpStream = TcpStream::connect(addr)?;
+        let stream: TcpStream = TcpStream::connect(addr)
+            .map_err(|_| Error::ConnectionError)?;
 
         info!("Connected to the server");
 
@@ -41,6 +42,6 @@ impl Stream for DataStream {
     }
 
     fn is_reconnected(&mut self) -> bool {
-        return self.reconnected;
+        self.reconnected
     }
 }

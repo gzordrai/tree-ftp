@@ -9,7 +9,10 @@ use log::{debug, info};
 use crate::{
     fs::{directory::Directory, file::File, node::NodeEnum},
     ftp::{
-        command::FtpCommand, command_stream::CommandStream, data_stream::DataStream, error::Result,
+        command::FtpCommand,
+        command_stream::CommandStream,
+        data_stream::DataStream,
+        error::{Error, Result},
     },
 };
 
@@ -87,7 +90,7 @@ impl FtpClient {
 
         debug!("Passive mode entered");
 
-        let (_, response) = responses.pop().ok_or("No response received")?;
+        let (_, response) = responses.pop().ok_or(Error::NoResponseReceived)?;
         let addr: SocketAddr = FtpClient::parse_passive_mode_response(self, response)?;
 
         self.data_addr = Some(addr.clone());
@@ -113,11 +116,13 @@ impl FtpClient {
                     parts = content.split('|').collect();
 
                     if parts.len() != 5 {
-                        return Err("Invalid data in extended passive mode response".into());
+                        return Err(Error::InvalidParsedData);
                     }
 
                     let ip: IpAddr = self.ftp_stream.get_addr().ip();
-                    let port: u16 = parts[3].parse::<u16>()?;
+                    let port: u16 = parts[3]
+                        .parse::<u16>()
+                        .map_err(|_| Error::InvalidParsedPort)?;
 
                     return Ok(SocketAddr::new(ip, port));
                 } else {
@@ -126,21 +131,27 @@ impl FtpClient {
                     parts = content.split(',').collect();
 
                     if parts.len() < 6 {
-                        return Err("Invalid data in passive mode response".into());
+                        return Err(Error::InvalidParsedData);
                     }
 
                     let ip: Ipv4Addr = Ipv4Addr::new(
-                        parts[0].parse()?,
-                        parts[1].parse()?,
-                        parts[2].parse()?,
-                        parts[3].parse()?,
+                        parts[0].parse().map_err(|_| Error::InvalidParsedIp)?,
+                        parts[1].parse().map_err(|_| Error::InvalidParsedIp)?,
+                        parts[2].parse().map_err(|_| Error::InvalidParsedIp)?,
+                        parts[3].parse().map_err(|_| Error::InvalidParsedIp)?,
                     );
-                    let port: u16 = parts[4].parse::<u16>()? * 256 + parts[5].parse::<u16>()?;
+                    let port: u16 = parts[4]
+                        .parse::<u16>()
+                        .map_err(|_| Error::InvalidParsedPort)?
+                        * 256
+                        + parts[5]
+                            .parse::<u16>()
+                            .map_err(|_| Error::InvalidParsedPort)?;
 
                     return Ok(SocketAddr::new(IpAddr::V4(ip), port));
                 }
             } else {
-                return Err("Closing parenthesis not found in passive mode response".into());
+                return Err(Error::InvalidParsedData);
             }
         }
 
@@ -148,7 +159,7 @@ impl FtpClient {
             return Ok(addr);
         }
 
-        Err("Opening parenthesis not found in passive mode response".into())
+        Err(Error::InvalidParsedData)
     }
 
     pub fn list_dir(&mut self, depth: usize, bfs: bool) -> Result<NodeEnum> {
@@ -217,7 +228,8 @@ impl FtpClient {
         depth: usize,
     ) -> Result<()> {
         let root: Rc<RefCell<Directory>> = Rc::new(RefCell::new(std::mem::take(dir)));
-        let mut queue: Vec<(Rc<RefCell<Directory>>, Vec<(u16, String)>, usize)> = vec![(root.clone(), responses, depth)];
+        let mut queue: Vec<(Rc<RefCell<Directory>>, Vec<(u16, String)>, usize)> =
+            vec![(root.clone(), responses, depth)];
 
         while let Some((current_dir, current_responses, current_depth)) = queue.pop() {
             for response in current_responses {
@@ -229,7 +241,8 @@ impl FtpClient {
                 let node_name: String = Self::parse_filename(&line);
 
                 if line.chars().next() == Some('d') {
-                    let subdir: Rc<RefCell<Directory>> = Rc::new(RefCell::new(Directory::new(node_name.clone())));
+                    let subdir: Rc<RefCell<Directory>> =
+                        Rc::new(RefCell::new(Directory::new(node_name.clone())));
 
                     if code < 500 && current_depth > 0 {
                         let subdir_responses = self.populate_dir_bfs(
@@ -241,7 +254,7 @@ impl FtpClient {
                         queue.push((subdir.clone(), subdir_responses, current_depth - 1));
                     }
 
-                    current_dir 
+                    current_dir
                         .borrow_mut()
                         .add(NodeEnum::Directory((*subdir.borrow()).clone()));
                 } else {
