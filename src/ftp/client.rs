@@ -77,8 +77,14 @@ impl FtpClient {
 
         self.ftp_stream
             .send_command(FtpCommand::User(username.to_string()))?;
-        self.ftp_stream
+
+        let responses: Responses = self
+            .ftp_stream
             .send_command(FtpCommand::Pass(password.to_string()))?;
+
+        if responses.iter().any(|response| response.0 == 530) {
+            return Err(Error::BadLogin);
+        }
 
         info!("Authentication successful");
 

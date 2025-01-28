@@ -34,6 +34,9 @@ pub enum Error {
 
     /// No response was received.
     NoResponseReceived,
+
+    /// Error indicating that the login attempt was unsuccessful.
+    BadLogin,
 }
 
 impl core::fmt::Display for Error {
