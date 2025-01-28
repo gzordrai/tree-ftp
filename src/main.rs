@@ -11,7 +11,7 @@ use fs::node::{NodeEnum, TraversalType};
 use ftp::client::FtpClient;
 use log::info;
 use serde_json::to_string;
-use std::{env, net::SocketAddr};
+use std::{env, fs::File, io::Write, net::SocketAddr};
 use utils::{domain::resolve_domain_to_socket_addr, parser::Args, validator::DomainAllowPort};
 use validators::traits::ValidateString;
 
@@ -32,7 +32,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root: NodeEnum = client.list_dir(args.depth, args.bfs)?;
 
     if args.json {
-        println!("{}", to_string(&root).unwrap());
+        let json = to_string(&root).unwrap();
+        let mut file = File::create("output.json").unwrap();
+
+        file.write_all(json.as_bytes()).unwrap();
+
+        println!("JSON file created successfully.");
     } else {
         if args.bfs {
             println!("{}", root.to_string("", TraversalType::BFS));
