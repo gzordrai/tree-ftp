@@ -116,7 +116,7 @@ impl Directory {
                             format!("{}|   ", current_indent)
                         };
 
-                        queue.push_back((subdir, new_indent));
+                        queue.push_back((&subdir, new_indent));
                     }
                     NodeEnum::File(file) => {
                         result.push_str(&format!("{}{}{}\n", current_indent, prefix, file.name()));
